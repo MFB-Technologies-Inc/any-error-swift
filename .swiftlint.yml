@@ -1,0 +1,10 @@
+disabled_rules:
+    - trailing_comma # conflicts with SwiftFormat
+    - opening_brace # conflicts with SwiftFormat
+excluded: # paths to ignore during linting. Takes precedence over `included`.
+    - ./**/.build/*
+    - ./**/.swiftpm/*
+identifier_name:
+    allowed_symbols: "_"
+type_name:
+    allowed_symbols: "_"

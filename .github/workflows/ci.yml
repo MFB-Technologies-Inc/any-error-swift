@@ -1,0 +1,211 @@
+name: ci
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+    workflow_dispatch:
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    lint:
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@v7
+            - name: SwiftFormat version
+              run: swiftformat --version
+            - name: Format lint
+              run: swiftformat --lint .
+            - name: Install SwiftLint
+              run: brew install swiftlint
+            - name: SwiftLint version
+              run: swiftlint --version
+            - name: Lint
+              run: swiftlint lint --quiet
+    apple:
+        name: apple (${{ matrix.platform }})
+        runs-on: macos-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                # A concrete simulator is required to run tests (a generic destination only builds).
+                # Device names change with every Xcode image, so instead of hardcoding one, the
+                # "Resolve test destination" step picks any available device for the platform's
+                # simulator runtime. `sim_runtime` is the runtime identifier prefix used by
+                # `simctl` (visionOS is "xrOS" there).
+                include:
+                    - platform: macOS
+                      destination: "platform=macOS"
+                    - platform: iOS
+                      destination: "generic/platform=iOS Simulator"
+                      sim_runtime: iOS
+                    - platform: tvOS
+                      destination: "generic/platform=tvOS Simulator"
+                      sim_runtime: tvOS
+                    - platform: watchOS
+                      destination: "generic/platform=watchOS Simulator"
+                      sim_runtime: watchOS
+                    - platform: visionOS
+                      destination: "generic/platform=visionOS Simulator"
+                      sim_runtime: xrOS
+        steps:
+            - uses: actions/checkout@v7
+            - name: Select latest Xcode
+              run: |
+                latest=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n1)
+                echo "DEVELOPER_DIR=$latest/Contents/Developer" >> "$GITHUB_ENV"
+            - name: Swift/Xcode version
+              run: swift --version && xcodebuild -version
+            - name: Build
+              run: xcodebuild build -scheme any-error-swift -destination "${{ matrix.destination }}"
+            - name: Resolve test destination
+              run: |
+                if [ -z "${{ matrix.sim_runtime }}" ]; then
+                  echo "TEST_DESTINATION=${{ matrix.destination }}" >> "$GITHUB_ENV"
+                  exit 0
+                fi
+                udid=$(xcrun simctl list devices available --json | jq -r --arg rt "${{ matrix.sim_runtime }}" '
+                  [ .devices
+                    | to_entries[]
+                    | select(.key | test("SimRuntime\\." + $rt + "-"))
+                    | .value[]
+                  ] | first | .udid // empty')
+                if [ -z "$udid" ]; then
+                  echo "No available ${{ matrix.platform }} simulator device found" >&2
+                  xcrun simctl list devices available >&2
+                  exit 1
+                fi
+                echo "Using $(xcrun simctl list devices available | grep "$udid")"
+                echo "TEST_DESTINATION=platform=${{ matrix.platform }} Simulator,id=$udid" >> "$GITHUB_ENV"
+            - name: Test
+              run: xcodebuild test -scheme any-error-swift -destination "$TEST_DESTINATION"
+
+    macos-spm:
+        # The apple job already covers macOS with default traits via xcodebuild; this exercises the
+        # SwiftPM manifest with default traits disabled (finding 2.3). On Darwin this still has
+        # Foundation available, so it is a cheap guard against manifest/trait-resolution regressions
+        # rather than a true FoundationEssentials-only run (that is covered on Linux/Windows/Wasm).
+        name: macOS spm (foundation-essentials)
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@v7
+            - name: Select latest Xcode
+              run: |
+                latest=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n1)
+                echo "DEVELOPER_DIR=$latest/Contents/Developer" >> "$GITHUB_ENV"
+            - name: Swift version
+              run: swift --version
+            - name: Build
+              run: swift build --disable-default-traits
+            - name: Test
+              run: swift test --parallel --disable-default-traits
+
+    linux:
+        name: linux (${{ matrix.config.name }})
+        runs-on: ubuntu-latest
+        container: swift:6.3.3
+        strategy:
+            fail-fast: false
+            matrix:
+                config:
+                    - name: default
+                      flags: ""
+                    - name: foundation-essentials
+                      flags: "--disable-default-traits"
+        steps:
+            - uses: actions/checkout@v7
+            - name: Swift version
+              run: swift --version
+            - name: Build
+              run: swift build ${{ matrix.config.flags }}
+            - name: Test
+              run: swift test --parallel ${{ matrix.config.flags }}
+
+    linux-embedded:
+        name: linux embedded
+        runs-on: ubuntu-latest
+        container: swift:6.3.3
+        steps:
+            - uses: actions/checkout@v7
+            - name: Swift version
+              run: swift --version
+            - name: Build
+              run: swift build --disable-default-traits --traits Embedded
+
+    windows:
+        name: windows (${{ matrix.config.name }})
+        runs-on: windows-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                config:
+                    - name: default
+                      flags: ""
+                    - name: foundation-essentials
+                      flags: "--disable-default-traits"
+        steps:
+            - uses: actions/checkout@v7
+            - name: Install Swift
+              uses: compnerd/gha-setup-swift@main
+              with:
+                  branch: swift-6.3.3-release
+                  tag: 6.3.3-RELEASE
+            - name: Swift version
+              run: swift --version
+            - name: Build
+              run: swift build ${{ matrix.config.flags }}
+            - name: Test
+              run: swift test --parallel ${{ matrix.config.flags }}
+
+    wasm:
+        # The Swift SDK for WebAssembly must match the toolchain version EXACTLY, so the container tag,
+        # the SDK URL, and the --checksum below are a set: when you bump Swift, update all three from
+        # https://www.swift.org/documentation/articles/wasm-getting-started.html
+        name: wasm (${{ matrix.config.name }})
+        runs-on: ubuntu-latest
+        container: swift:6.3.3
+        strategy:
+            fail-fast: false
+            matrix:
+                config:
+                    - name: default
+                      flags: ""
+                    - name: foundation-essentials
+                      flags: "--disable-default-traits"
+        steps:
+            - uses: actions/checkout@v7
+            - name: Install WebAssembly SDK
+              run: |
+                  swift sdk install \
+                    https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz \
+                    --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
+                  swift sdk list
+            - name: Build
+              run: swift build --swift-sdk swift-6.3.3-RELEASE_wasm ${{ matrix.config.flags }}
+            - name: Test
+              run: swift test --swift-sdk swift-6.3.3-RELEASE_wasm ${{ matrix.config.flags }}
+
+    android:
+        name: android (${{ matrix.config.name }})
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                config:
+                    - name: default
+                      flags: ""
+                    - name: foundation-essentials
+                      flags: "--disable-default-traits"
+        steps:
+            - uses: actions/checkout@v7
+            - name: "Test"
+              uses: skiptools/swift-android-action@v2
+              with:
+                  # Ubuntu runners low on space causes the emulator to fail to install
+                  free-disk-space: true
+                  swift-build-flags: ${{ matrix.config.flags }}
+                  swift-test-flags: ${{ matrix.config.flags }}

@@ -1,0 +1,9 @@
+--extensionacl on-declarations
+--redundanttype explicit
+--swiftversion 6.2
+--maxwidth 120
+--header "{file}\nAnyError\n\nCopyright MFB Technologies, Inc. All rights reserved.\n\nThis source code is licensed under the MIT license found in the\nLICENSE file in the root directory of this source tree."
+--allman false
+--exclude **/.swiftpm/*,**/.build/*
+--wraparguments before-first
+--wrapcollections before-first
