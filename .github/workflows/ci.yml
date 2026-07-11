@@ -207,5 +207,7 @@ jobs:
               with:
                   # Ubuntu runners low on space causes the emulator to fail to install
                   free-disk-space: true
+                  # Trait selection is resolved at build time, so --disable-default-traits belongs
+                  # in swift-build-flags only. swift-test-flags is appended to the compiled xctest
+                  # runner binary, which rejects build flags with `Invalid option`.
                   swift-build-flags: ${{ matrix.config.flags }}
-                  swift-test-flags: ${{ matrix.config.flags }}
