@@ -1,5 +1,9 @@
 # AnyError
 
+[![ci](https://github.com/MFB-Technologies-Inc/any-error-swift/actions/workflows/ci.yml/badge.svg)](https://github.com/MFB-Technologies-Inc/any-error-swift/actions/workflows/ci.yml)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FMFB-Technologies-Inc%2Fany-error-swift%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/MFB-Technologies-Inc/any-error-swift)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FMFB-Technologies-Inc%2Fany-error-swift%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/MFB-Technologies-Inc/any-error-swift)
+
 A concrete, value-semantic, `Hashable` error type that erases errors on every Swift platform, with or without Foundation, while retaining all the important information carried in the original error.
 
   * [Motivation](#motivation)
