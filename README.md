@@ -13,6 +13,7 @@ A concrete, value-semantic, `Hashable` error type that erases errors on every Sw
   * [Your own error types](#your-own-error-types)
   * [Localized errors](#localized-errors)
   * [Platform support](#platform-support)
+  * [Documentation](#documentation)
   * [Installation](#installation)
   * [License](#license)
 
@@ -217,6 +218,11 @@ Because reflection is also absent, a `CustomAnyError` conformer must supply `def
 `originatingTypeName` explicitly there rather than relying on their reflection-derived defaults. The
 localized metadata (`failureReason`/`helpAnchor`/`recoverySuggestion`) is always `nil` in Embedded,
 as there is no `LocalizedError` existential to read it from.
+
+## Documentation
+
+  * [`main`](https://swiftpackageindex.com/MFB-Technologies-Inc/any-error-swift/main/documentation/anyerror/)
+  * [0.x.x](https://swiftpackageindex.com/MFB-Technologies-Inc/any-error-swift/~/documentation/anyerror/)
 
 ## Installation
 
