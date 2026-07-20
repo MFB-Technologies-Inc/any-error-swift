@@ -211,3 +211,29 @@ jobs:
                   # in swift-build-flags only. swift-test-flags is appended to the compiled xctest
                   # runner binary, which rejects build flags with `Invalid option`.
                   swift-build-flags: ${{ matrix.config.flags }}
+
+    ci-success:
+        name: ci success
+        if: always()
+        runs-on: ubuntu-latest
+        needs:
+            - lint
+            - apple
+            - macos-spm
+            - linux
+            - linux-embedded
+            - windows
+            - wasm
+            - android
+        steps:
+            - name: Check all jobs succeeded
+              run: |
+                  results="${{ join(needs.*.result, ' ') }}"
+                  echo "dependency results: $results"
+                  for r in $results; do
+                  if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+                    echo "::error::a required ci job did not pass (result=$r)"
+                    exit 1
+                  fi
+                  done
+                  echo "all ci jobs passed or were skipped"
